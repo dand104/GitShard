@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.room)
 }
 
 android {
@@ -10,7 +13,9 @@ android {
             minorApiLevel = 1
         }
     }
-
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
     defaultConfig {
         applicationId = "io.gitshard.gitshard"
         minSdk = 34
@@ -22,6 +27,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             optimization {
                 enable = true
@@ -35,14 +44,32 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/INDEX.LIST",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+            )
+        }
+    }
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 kotlin {
     compilerOptions {
         optIn.addAll(
             "androidx.compose.material3.ExperimentalMaterial3Api",
-            "androidx.compose.material3.ExperimentalMaterial3ExpressiveApi"
+            "androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
+            "androidx.compose.animation.ExperimentalSharedTransitionApi",
         )
     }
 }
@@ -56,10 +83,34 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    implementation(libs.androidx.datastore)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
+
+    implementation(libs.jetbrains.markdown)
+    implementation(libs.eclipse.jgit)
+    runtimeOnly(libs.slf4j.nop)
+
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
+
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

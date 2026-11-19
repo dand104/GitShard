@@ -10,3 +10,21 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+# Navigation 3 @Serializable Route keys & kotlinx.serialization
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class * {
+    public static kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class io.gitshard.gitshard.navigation.**$$serializer { *; }
+-keepclassmembers class io.gitshard.gitshard.navigation.** {
+    *** Companion;
+}
+
+-keep class org.eclipse.jgit.internal.JGitText { *; }
+-keep class * extends org.eclipse.jgit.nls.TranslationBundle { *; }
+-dontwarn org.eclipse.jgit.**
+-dontwarn org.slf4j.**
