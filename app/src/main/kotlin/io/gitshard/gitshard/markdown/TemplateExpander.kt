@@ -17,7 +17,7 @@ class TemplateExpander(
         now: ZonedDateTime = ZonedDateTime.now(clock),
     ): String = PLACEHOLDER_REGEX.replace(template) { match ->
         val key = match.groupValues[1].trim()
-        val formatArg = match.groupValues[2].takeIf { it.isNotEmpty() }
+        val formatArg = match.groupValues[2].trim().takeIf { it.isNotEmpty() }
 
         when (key.lowercase()) {
             "title" -> title

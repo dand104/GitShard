@@ -23,8 +23,8 @@ class BaseParser {
         val root = MarkdownParser(flavour, true, CancellationToken.NonCancellable)
             .buildMarkdownTreeFromString(body as CharSequence)
         val excludedRanges = ArrayList<IntRange>()
-        val headings = ArrayList<NoteHeading>()
-        val tasks = ArrayList<NoteTask>()
+        val rawHeadings = ArrayList<Pair<Int, NoteHeading>>()
+        val rawTasks = ArrayList<RawTask>()
 
         collectFromAst(
             node = root,
@@ -32,13 +32,34 @@ class BaseParser {
             bodyOffset = bodyOffset,
             lineIndex = lineIndex,
             excludedRanges = excludedRanges,
-            headings = headings,
-            tasks = tasks,
+            headings = rawHeadings,
+            tasks = rawTasks,
         )
 
         val astExcluded = mergeRanges(excludedRanges)
         val commentRanges = collectObsidianComments(body, astExcluded)
         val mergedExcluded = if (commentRanges.isEmpty()) astExcluded else mergeRanges(astExcluded + commentRanges)
+
+        val headings = rawHeadings
+            .filterNot { (offset, _) -> isExcluded(offset, commentRanges) }
+            .map { it.second }
+
+        val tasks = rawTasks
+            .filterNot { isExcluded(it.offset, commentRanges) }
+            .map { raw ->
+                NoteTask(
+                    lineNumber = raw.lineNumber,
+                    text = raw.text,
+                    statusChar = raw.statusChar,
+                    isCompleted = raw.isCompleted,
+                    dueDate = raw.dueDate,
+                    tags = if (raw.rawText.isEmpty()) {
+                        emptySet()
+                    } else {
+                        extractTags(raw.rawText, mergedExcluded, baseOffset = raw.rawTextOffset)
+                    },
+                )
+            }
 
         val links = extractWikilinks(
             body = body,
@@ -79,8 +100,8 @@ class BaseParser {
         bodyOffset: Int,
         lineIndex: LineIndex,
         excludedRanges: MutableList<IntRange>,
-        headings: MutableList<NoteHeading>,
-        tasks: MutableList<NoteTask>,
+        headings: MutableList<Pair<Int, NoteHeading>>,
+        tasks: MutableList<RawTask>,
     ) {
         when (node.type) {
             MarkdownElementTypes.CODE_FENCE,
@@ -105,7 +126,9 @@ class BaseParser {
             MarkdownElementTypes.SETEXT_1,
             MarkdownElementTypes.SETEXT_2,
                 -> {
-                extractHeading(node, body, bodyOffset, lineIndex)?.let(headings::add)
+                extractHeading(node, body, bodyOffset, lineIndex)?.let {
+                    headings.add(node.startOffset to it)
+                }
             }
 
             MarkdownElementTypes.LIST_ITEM -> {
@@ -148,25 +171,29 @@ class BaseParser {
         body: String,
         bodyOffset: Int,
         lineIndex: LineIndex,
-    ): NoteTask? {
+    ): RawTask? {
         val start = node.startOffset
         val lineEnd = body.indexOf('\n', start).let { if (it == -1) node.endOffset else minOf(it, node.endOffset) }
         val firstLine = body.substring(start, lineEnd).trimEnd('\r')
 
         val match = TASK_LINE_REGEX.matchEntire(firstLine) ?: return null
         val statusChar = match.groupValues[1][0]
-        val rawTaskText = match.groupValues[2].trim()
+        val textGroup = match.groups[2]
+        val rawTaskText = textGroup?.value.orEmpty()
+        val trimmedTaskText = rawTaskText.trim()
+        val rawTextOffset = start + (textGroup?.range?.first ?: 0)
 
-        val dueDate = parseDueDate(rawTaskText)
-        val taskTags = extractTags(rawTaskText, emptyList())
+        val dueDate = parseDueDate(trimmedTaskText)
 
-        return NoteTask(
+        return RawTask(
+            offset = start,
             lineNumber = lineIndex.lineOf(bodyOffset + start),
-            text = rawTaskText,
+            text = trimmedTaskText,
+            rawText = rawTaskText,
+            rawTextOffset = rawTextOffset,
             statusChar = statusChar,
             isCompleted = statusChar == 'x' || statusChar == 'X',
             dueDate = dueDate,
-            tags = taskTags,
         )
     }
 
@@ -212,11 +239,15 @@ class BaseParser {
         return results
     }
 
-    private fun extractTags(text: String, excluded: List<IntRange>): Set<String> {
+    private fun extractTags(
+        text: String,
+        excluded: List<IntRange>,
+        baseOffset: Int = 0,
+    ): Set<String> {
         val tags = LinkedHashSet<String>()
         for (match in INLINE_TAG_REGEX.findAll(text)) {
             val hashPos = match.groups[1]?.range?.first ?: continue
-            if (isExcluded(hashPos, excluded)) continue
+            if (isExcluded(baseOffset + hashPos, excluded)) continue
             val candidate = match.groupValues[1]
             normalizeTag(candidate)?.let(tags::add)
         }
@@ -287,8 +318,8 @@ class BaseParser {
             val trimmed = line.trim()
             if (trimmed.isEmpty() || trimmed.startsWith('#')) continue
 
-            if (currentListKey != null && line.firstOrNull()?.isWhitespace() == true && trimmed.startsWith("- ")) {
-                val item = unquoteYamlValue(trimmed.removePrefix("- ").trim())
+            if (currentListKey != null && (trimmed.startsWith("- ") || trimmed == "-")) {
+                val item = unquoteYamlValue(trimmed.removePrefix("-").trim())
                 if (item.isNotEmpty()) {
                     recordFrontmatterEntry(currentListKey, item, properties, aliases, tags)
                 }
@@ -539,6 +570,17 @@ class BaseParser {
 
     private fun nextLineStart(text: String, lineEnd: Int): Int =
         if (lineEnd < text.length && text[lineEnd] == '\n') lineEnd + 1 else text.length
+
+    private data class RawTask(
+        val offset: Int,
+        val lineNumber: Int,
+        val text: String,
+        val rawText: String,
+        val rawTextOffset: Int,
+        val statusChar: Char,
+        val isCompleted: Boolean,
+        val dueDate: LocalDate?,
+    )
 
     private class LineIndex(text: String) {
         private val lineStarts: IntArray

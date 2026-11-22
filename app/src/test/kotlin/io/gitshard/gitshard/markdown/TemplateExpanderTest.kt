@@ -32,4 +32,15 @@ class TemplateExpanderTest {
             result,
         )
     }
+
+    @Test
+    fun `trims whitespace around format arguments`() {
+        val expander = TemplateExpander(locale = Locale.US)
+        val fixedNow = ZonedDateTime.of(2026, 11, 21, 9, 5, 30, 0, ZoneOffset.UTC)
+
+        val template = "A: {{ date: YYYY-MM-DD }} | B: {{date:   }} | C: {{date:YYYY[ ]}}"
+        val result = expander.expand(template, title = "Note", now = fixedNow)
+
+        assertEquals("A: 2026-11-21 | B: 2026-11-21 | C: 2026 ", result)
+    }
 }

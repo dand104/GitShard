@@ -28,4 +28,21 @@ class TaskLineMutatorTest {
         assertTrue(TaskLineMutator.toggleTask(content, 2) is TaskMutationResult.NotATaskLine)
         assertTrue(TaskLineMutator.toggleTask(content, 5) is TaskMutationResult.LineOutOfBounds)
     }
+
+    @Test
+    fun `toggles tasks inside blockquotes and callouts`() {
+        val content = "> [!todo]\n> - [ ] Callout task\n> > 1. [x] Nested quote task"
+
+        val toggledCallout = TaskLineMutator.toggleTask(content, lineNumber = 2)
+        assertTrue(toggledCallout is TaskMutationResult.Updated)
+        toggledCallout as TaskMutationResult.Updated
+        assertEquals("> [!todo]\n> - [x] Callout task\n> > 1. [x] Nested quote task", toggledCallout.content)
+        assertTrue(toggledCallout.isCompleted)
+
+        val toggledNested = TaskLineMutator.toggleTask(toggledCallout.content, lineNumber = 3)
+        assertTrue(toggledNested is TaskMutationResult.Updated)
+        toggledNested as TaskMutationResult.Updated
+        assertEquals("> [!todo]\n> - [x] Callout task\n> > 1. [ ] Nested quote task", toggledNested.content)
+        assertEquals(false, toggledNested.isCompleted)
+    }
 }

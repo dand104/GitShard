@@ -97,4 +97,37 @@ class BaseParserTest {
         assertEquals(Frontmatter.EMPTY, parsed.frontmatter)
         assertTrue(parsed.snippet.contains("Just a plain paragraph"))
     }
+
+    @Test
+    fun `ignores headings and tasks inside obsidian comments and excluded spans in tasks`() {
+        val md = """
+            ---
+            tags:
+            - unindented-tag
+            ---
+            %%
+            # Hidden Heading
+            - [ ] Hidden task #hidden-tag
+            %%
+
+            # Visible Heading
+            - [ ] Check `foo #code-tag` and %% #comment-tag %% #real-tag
+            > [!todo] Callout
+            > - [ ] Task inside callout #callout-tag
+        """.trimIndent()
+
+        val parsed = parser.parse(md)
+
+        assertEquals("Visible Heading", parsed.title)
+        assertEquals(listOf(NoteHeading(1, "Visible Heading", lineNumber = 10)), parsed.headings)
+        assertEquals(
+            setOf("unindented-tag", "real-tag", "callout-tag"),
+            parsed.tags,
+        )
+        assertEquals(2, parsed.tasks.size)
+        assertEquals(11, parsed.tasks[0].lineNumber)
+        assertEquals(setOf("real-tag"), parsed.tasks[0].tags)
+        assertEquals(13, parsed.tasks[1].lineNumber)
+        assertEquals(setOf("callout-tag"), parsed.tasks[1].tags)
+    }
 }

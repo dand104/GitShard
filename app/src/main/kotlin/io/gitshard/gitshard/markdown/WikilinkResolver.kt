@@ -137,7 +137,9 @@ object WikilinkResolver {
     }
 
     private fun ensureExtension(path: VaultPath, isEmbed: Boolean): VaultPath {
-        if (isEmbed || path.extension.isNotEmpty()) return path
+        if (isEmbed || path.isMarkdown || path.extension in KNOWN_NON_MARKDOWN_EXTENSIONS) {
+            return path
+        }
         return VaultPath.of("${path.value}.md")
     }
 
@@ -163,4 +165,11 @@ object WikilinkResolver {
         }
         return (a.size - common) + (b.size - common)
     }
+
+    private val KNOWN_NON_MARKDOWN_EXTENSIONS = setOf(
+        "canvas", "base", "pdf", "txt", "json", "csv",
+        "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif",
+        "mp3", "wav", "m4a", "ogg", "flac", "3gp",
+        "mp4", "webm", "mov", "mkv", "ogv",
+    )
 }

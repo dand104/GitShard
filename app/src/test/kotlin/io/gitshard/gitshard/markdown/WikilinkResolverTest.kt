@@ -52,4 +52,21 @@ class WikilinkResolverTest {
             WikilinkResolver.resolve(source, "Ideas/New Note", index = index),
         )
     }
+
+    @Test
+    fun `appends md to unresolved dotted note names but preserves known extensions`() {
+        val source = VaultPath.of("Work/Index.md")
+        assertEquals(
+            LinkResolution.Unresolved(VaultPath.of("Release 1.0.md"), null),
+            WikilinkResolver.resolve(source, "Release 1.0", index = index),
+        )
+        assertEquals(
+            LinkResolution.Unresolved(VaultPath.of("2026.11.22.md"), null),
+            WikilinkResolver.resolve(source, "2026.11.22", index = index),
+        )
+        assertEquals(
+            LinkResolution.Unresolved(VaultPath.of("Assets/new-chart.png"), null),
+            WikilinkResolver.resolve(source, "Assets/new-chart.png", index = index),
+        )
+    }
 }

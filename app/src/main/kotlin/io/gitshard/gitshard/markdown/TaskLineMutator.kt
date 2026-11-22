@@ -73,5 +73,5 @@ object TaskLineMutator {
         return count
     }
 
-    private val TASK_PREFIX_REGEX = Regex("""^\s*(?:[-*+]|\d+[.)])\s+\[(.)](?:\s|$)""")
+    private val TASK_PREFIX_REGEX = Regex("""^(?:\s*>)*\s*(?:[-*+]|\d+[.)])\s+\[(.)](?:\s|$)""")
 }
