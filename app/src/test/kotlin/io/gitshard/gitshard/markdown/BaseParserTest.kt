@@ -2,6 +2,7 @@ package io.gitshard.gitshard.markdown
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -129,5 +130,21 @@ class BaseParserTest {
         assertEquals(setOf("real-tag"), parsed.tasks[0].tags)
         assertEquals(13, parsed.tasks[1].lineNumber)
         assertEquals(setOf("callout-tag"), parsed.tasks[1].tags)
+    }
+
+    @Test
+    fun `ignores due dates inside inline code and obsidian comments`() {
+        val md = """
+            - [ ] Document format `📅 2026-11-25`
+            - [ ] Deferred %% [due:: 2026-11-26] %%
+            - [ ] Replace `[due:: 2026-01-01]` before 📅 2026-12-01
+        """.trimIndent()
+
+        val parsed = parser.parse(md)
+
+        assertEquals(3, parsed.tasks.size)
+        assertNull(parsed.tasks[0].dueDate)
+        assertNull(parsed.tasks[1].dueDate)
+        assertEquals(LocalDate.of(2026, 12, 1), parsed.tasks[2].dueDate)
     }
 }

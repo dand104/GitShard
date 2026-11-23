@@ -60,7 +60,6 @@ object WikilinkResolver {
         sourceNote = sourceNote,
         targetNote = link.targetNote,
         subpath = link.subpath,
-        isEmbed = link.isEmbed,
         index = index,
     )
 
@@ -68,7 +67,6 @@ object WikilinkResolver {
         sourceNote: VaultPath,
         targetNote: String,
         subpath: String? = null,
-        isEmbed: Boolean = false,
         index: VaultPathIndex,
     ): LinkResolution {
         val trimmedTarget = targetNote.trim()
@@ -87,7 +85,7 @@ object WikilinkResolver {
             if (resolvedRelative != null) {
                 val match = index.findExact(resolvedRelative.value.lowercase())
                 if (match != null) return LinkResolution.Resolved(match, subpath)
-                return LinkResolution.Unresolved(ensureExtension(resolvedRelative, isEmbed), subpath)
+                return LinkResolution.Unresolved(ensureExtension(resolvedRelative), subpath)
             }
         }
 
@@ -114,7 +112,7 @@ object WikilinkResolver {
         val suggestedBase = VaultPath.ofOrNull(normalized)
             ?: sourceNote.parent?.resolve(normalized.substringAfterLast('/'))
             ?: VaultPath.of(normalized.substringAfterLast('/').ifEmpty { "Untitled" })
-        return LinkResolution.Unresolved(ensureExtension(suggestedBase, isEmbed), subpath)
+        return LinkResolution.Unresolved(ensureExtension(suggestedBase), subpath)
     }
 
     private fun resolveRelative(baseFolder: VaultPath?, relative: String): VaultPath? {
@@ -136,8 +134,8 @@ object WikilinkResolver {
         return VaultPath.ofOrNull(stack.joinToString("/"))
     }
 
-    private fun ensureExtension(path: VaultPath, isEmbed: Boolean): VaultPath {
-        if (isEmbed || path.isMarkdown || path.extension in KNOWN_NON_MARKDOWN_EXTENSIONS) {
+    private fun ensureExtension(path: VaultPath): VaultPath {
+        if (path.isMarkdown || path.extension in KNOWN_NON_MARKDOWN_EXTENSIONS) {
             return path
         }
         return VaultPath.of("${path.value}.md")

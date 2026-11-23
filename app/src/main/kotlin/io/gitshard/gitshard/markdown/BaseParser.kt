@@ -52,7 +52,11 @@ class BaseParser {
                     text = raw.text,
                     statusChar = raw.statusChar,
                     isCompleted = raw.isCompleted,
-                    dueDate = raw.dueDate,
+                    dueDate = if (raw.rawText.isEmpty()) {
+                        null
+                    } else {
+                        parseDueDate(raw.rawText, mergedExcluded, baseOffset = raw.rawTextOffset)
+                    },
                     tags = if (raw.rawText.isEmpty()) {
                         emptySet()
                     } else {
@@ -183,8 +187,6 @@ class BaseParser {
         val trimmedTaskText = rawTaskText.trim()
         val rawTextOffset = start + (textGroup?.range?.first ?: 0)
 
-        val dueDate = parseDueDate(trimmedTaskText)
-
         return RawTask(
             offset = start,
             lineNumber = lineIndex.lineOf(bodyOffset + start),
@@ -193,7 +195,6 @@ class BaseParser {
             rawTextOffset = rawTextOffset,
             statusChar = statusChar,
             isCompleted = statusChar == 'x' || statusChar == 'X',
-            dueDate = dueDate,
         )
     }
 
@@ -432,11 +433,18 @@ class BaseParser {
         return result
     }
 
-    private fun parseDueDate(text: String): LocalDate? {
-        val raw = DUE_DATE_REGEX.find(text)?.let { match ->
-            match.groupValues[1].ifEmpty { match.groupValues[2] }
-        } ?: return null
-        return runCatching { LocalDate.parse(raw) }.getOrNull()
+    private fun parseDueDate(
+        text: String,
+        excluded: List<IntRange>,
+        baseOffset: Int = 0,
+    ): LocalDate? {
+        for (match in DUE_DATE_REGEX.findAll(text)) {
+            if (isExcluded(baseOffset + match.range.first, excluded)) continue
+            val raw = match.groupValues[1].ifEmpty { match.groupValues[2] }
+            val parsed = runCatching { LocalDate.parse(raw) }.getOrNull()
+            if (parsed != null) return parsed
+        }
+        return null
     }
 
     private fun splitWikilinkAlias(inner: String): Pair<String, String?> {
@@ -579,7 +587,6 @@ class BaseParser {
         val rawTextOffset: Int,
         val statusChar: Char,
         val isCompleted: Boolean,
-        val dueDate: LocalDate?,
     )
 
     private class LineIndex(text: String) {
