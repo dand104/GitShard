@@ -23,6 +23,10 @@
 -keepclassmembers class io.gitshard.gitshard.navigation.** {
     *** Companion;
 }
+-keep,includedescriptorclasses class io.gitshard.gitshard.data.prefs.**$$serializer { *; }
+-keepclassmembers class io.gitshard.gitshard.data.prefs.** {
+    *** Companion;
+}
 
 -keep class org.eclipse.jgit.internal.JGitText { *; }
 -keep class * extends org.eclipse.jgit.nls.TranslationBundle { *; }
