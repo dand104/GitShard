@@ -4,18 +4,13 @@ import io.gitshard.gitshard.core.AppDispatchers
 import io.gitshard.gitshard.core.AtomicFileWriter
 import io.gitshard.gitshard.core.VaultPath
 import io.gitshard.gitshard.git.jgit.JGitClient
+import io.gitshard.gitshard.testutil.IsolatedJGitRule
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.eclipse.jgit.api.Git
-import org.eclipse.jgit.lib.Config
-import org.eclipse.jgit.storage.file.FileBasedConfig
 import org.eclipse.jgit.transport.URIish
-import org.eclipse.jgit.util.FS
-import org.eclipse.jgit.util.SystemReader
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -26,19 +21,8 @@ class JGitClientTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
-    private var previousSystemReader: SystemReader? = null
-
-    @Before
-    fun isolateJGitEnvironment() {
-        val current = SystemReader.getInstance()
-        previousSystemReader = current
-        SystemReader.setInstance(IsolatedSystemReader(current, tempFolder.newFolder("jgit-env")))
-    }
-
-    @After
-    fun restoreJGitEnvironment() {
-        previousSystemReader?.let(SystemReader::setInstance)
-    }
+    @get:Rule
+    val isolatedJGit = IsolatedJGitRule()
 
     @Test
     fun `init commit delete and log work end to end`() = runTest {
@@ -237,31 +221,5 @@ class JGitClientTest {
         pullResult as PullResult.Merged
         assertEquals(setOf(VaultPath.of("Notes.md")), pullResult.changedPaths)
         assertEquals("# Notes\n", File(localB, "Notes.md").readText())
-    }
-
-    private class IsolatedSystemReader(
-        delegate: SystemReader,
-        private val isolatedDir: File,
-    ) : SystemReader.Delegate(delegate) {
-
-        override fun openUserConfig(parent: Config?, fs: FS): FileBasedConfig =
-            FileBasedConfig(parent, File(isolatedDir, "user.gitconfig"), fs)
-
-        override fun openSystemConfig(parent: Config?, fs: FS): FileBasedConfig =
-            FileBasedConfig(parent, File(isolatedDir, "system.gitconfig"), fs)
-
-        override fun openJGitConfig(parent: Config?, fs: FS): FileBasedConfig =
-            FileBasedConfig(parent, File(isolatedDir, "jgit.config"), fs)
-
-        override fun getenv(variable: String): String? = when (variable) {
-            "GIT_CONFIG_GLOBAL",
-            "GIT_CONFIG_SYSTEM",
-            "GIT_CONFIG_PARAMETERS",
-            "GIT_CONFIG_COUNT",
-            "XDG_CONFIG_HOME",
-            -> null
-            "HOME" -> isolatedDir.absolutePath
-            else -> super.getenv(variable)
-        }
     }
 }

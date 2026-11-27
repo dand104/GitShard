@@ -32,3 +32,5 @@
 -keep class * extends org.eclipse.jgit.nls.TranslationBundle { *; }
 -dontwarn org.eclipse.jgit.**
 -dontwarn org.slf4j.**
+
+-keep class io.gitshard.gitshard.data.sync.GitSyncWorker { *; }

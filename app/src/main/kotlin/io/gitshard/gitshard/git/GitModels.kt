@@ -2,6 +2,20 @@ package io.gitshard.gitshard.git
 
 import io.gitshard.gitshard.core.VaultPath
 
+enum class GitErrorKind(val isRetryable: Boolean) {
+    NETWORK(isRetryable = true),
+    LOCK(isRetryable = true),
+    AUTH(isRetryable = false),
+    CONFIG(isRetryable = false),
+    UNKNOWN(isRetryable = false),
+}
+
+class GitException(
+    val kind: GitErrorKind,
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
 data class GitAuthor(
     val name: String,
     val email: String,
@@ -118,6 +132,7 @@ sealed interface PullResult {
     data class Failed(
         val message: String,
         val conflictingPaths: Set<VaultPath> = emptySet(),
+        val isRetryable: Boolean = false,
     ) : PullResult
 }
 
@@ -153,5 +168,6 @@ sealed interface SyncResult {
     data class Error(
         val message: String,
         val cause: Throwable? = null,
+        val isRetryable: Boolean = false,
     ) : SyncResult
 }

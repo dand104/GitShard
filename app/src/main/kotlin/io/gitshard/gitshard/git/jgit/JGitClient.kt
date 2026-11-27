@@ -9,11 +9,13 @@ import io.gitshard.gitshard.git.GitAuthor
 import io.gitshard.gitshard.git.GitClient
 import io.gitshard.gitshard.git.GitCommit
 import io.gitshard.gitshard.git.GitCredentials
+import io.gitshard.gitshard.git.GitException
 import io.gitshard.gitshard.git.GitRepoState
 import io.gitshard.gitshard.git.GitStatusSnapshot
 import io.gitshard.gitshard.git.PullResult
 import io.gitshard.gitshard.git.PushResult
 import io.gitshard.gitshard.git.jgit.JGitAuth.applyTransportConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -285,6 +287,7 @@ class JGitClient(
                 return@withRepoLock PullResult.Failed(
                     message = e.message ?: "Local changes would be overwritten by pull",
                     conflictingPaths = paths,
+                    isRetryable = true,
                 )
             }
 
@@ -294,7 +297,7 @@ class JGitClient(
                 MergeResult.MergeStatus.FAST_FORWARD,
                 MergeResult.MergeStatus.FAST_FORWARD_SQUASHED,
                 MergeResult.MergeStatus.MERGED,
-                -> {
+                    -> {
                     val newHeadId = repo.resolve(Constants.HEAD)
                     PullResult.Merged(
                         changedPaths = diffPathsInternal(repo, oldHeadId, newHeadId),
@@ -464,7 +467,17 @@ class JGitClient(
         withContext(dispatchers.io) {
             val lockKey = repoDir.canonicalPath
             val mutex = repoLocks.computeIfAbsent(lockKey) { Mutex() }
-            mutex.withLock(action = block)
+            mutex.withLock {
+                try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: GitException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw JGitErrorMapper.toGitException(e)
+                }
+            }
         }
 
     private fun openGit(repoDir: File): Git = Git.open(repoDir)
@@ -496,6 +509,7 @@ class JGitClient(
             return PullResult.Failed(
                 message = e.message ?: "Local files would be overwritten by pull",
                 conflictingPaths = paths,
+                isRetryable = true,
             )
         } finally {
             dirCache.unlock()
